@@ -11,6 +11,8 @@ dependencies = [
     "vaderSentiment>=3.3",
     "transformers>=4.40",
     "torch>=2.2",
+    "gensim>=4.3",
+    "bertopic>=0.16",
 ]
 
 [project.optional-dependencies]
