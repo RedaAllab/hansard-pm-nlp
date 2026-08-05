@@ -6,6 +6,7 @@ windows), LDA topics over time, and the PM-attribution classifier's results.
 Run with: streamlit run app/app.py
 """
 
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -15,11 +16,17 @@ import streamlit as st
 from gensim import corpora
 from gensim.models import LdaModel
 
-from hansard_pm_nlp.event_study import CRISIS_WINDOWS
-from hansard_pm_nlp.lda import get_top_words
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+
+# Import the two pandas/gensim-only modules the dashboard needs directly from
+# src/, rather than pip-installing the full hansard_pm_nlp package - that
+# package's pyproject.toml pulls in torch/transformers/bertopic/spacy, none
+# of which this dashboard uses (all heavy computation already happened
+# offline; see requirements-app.txt).
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+from hansard_pm_nlp.event_study import CRISIS_WINDOWS  # noqa: E402
+from hansard_pm_nlp.lda import get_top_words  # noqa: E402
 
 PM_COLORS = {
     "Boris Johnson": "#1f77b4",
@@ -143,7 +150,7 @@ with tab_overview:
         showlegend=True,
         height=550,
     )
-    st.plotly_chart(_dark(fig), use_container_width=True)
+    st.plotly_chart(_dark(fig), width="stretch")
     st.caption(
         "Each axis min-max normalized across PMs (0=lowest, 1=highest) so "
         "shapes are comparable. Type-token ratio (TTR) is deliberately left "
@@ -221,7 +228,7 @@ with tab_affect:
                 annotation_position="top left",
             )
     fig.update_layout(height=500, xaxis_title="Sitting date", yaxis_title=dv_choice)
-    st.plotly_chart(_dark(fig), use_container_width=True)
+    st.plotly_chart(_dark(fig), width="stretch")
 
 # --- Topics over time -------------------------------------------------------
 with tab_topics:
@@ -266,7 +273,7 @@ with tab_topics:
         labels={"sitting_date": "Month"},
     )
     fig.update_layout(height=550)
-    st.plotly_chart(_dark(fig), use_container_width=True)
+    st.plotly_chart(_dark(fig), width="stretch")
 
     with st.expander("Topic word lists"):
         for i, words in top_words.items():
@@ -317,7 +324,7 @@ with tab_classifier:
         color_continuous_scale="Blues",
     )
     fig.update_layout(height=450)
-    st.plotly_chart(_dark(fig), use_container_width=True)
+    st.plotly_chart(_dark(fig), width="stretch")
 
     fi = fi_logreg if model_choice == "pred_logreg" else fi_hgb
     fig2 = px.bar(
@@ -328,4 +335,4 @@ with tab_classifier:
         title="Top 15 features (permutation importance)",
     )
     fig2.update_layout(height=500)
-    st.plotly_chart(_dark(fig2), use_container_width=True)
+    st.plotly_chart(_dark(fig2), width="stretch")

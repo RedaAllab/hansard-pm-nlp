@@ -2,6 +2,39 @@
 
 NLP analysis of UK Prime Ministers' rhetoric (2019-present), built on the parquet corpus produced by [`hansard-pm-extraction`](https://github.com/RedaAllab/hansard-pm-extraction). Second stage of a two-repository project; see that repo's `PROJECT_SUMMARY.md` for the full project (research question, hypotheses, roadmap) and `CLAUDE.md` for conventions.
 
+**[Live dashboard](#) - link added once deployed** · Four Prime Ministers (Johnson, Truss, Sunak, Starmer), 291 Commons sittings, four layered NLP analyses, tested against four pre-registered hypotheses.
+
+## Results by hypothesis
+
+| Hypothesis | Method | Result |
+|---|---|---|
+| **H1** - PMs have a distinguishable stylometric signature | Logistic regression / HistGradientBoosting on lexical, readability, hedging, function-word, and POS features; temporal train/test split | **Confirmed.** 91.5% / 93.2% accuracy vs. 33.3% (uniform) / 49.2% (majority-class) chance baselines. |
+| **H2** - Negative sentiment/hedging increase during crisis windows | OLS, PM fixed effects, one dummy per named crisis (Covid-19, mini-budget, Ukraine invasion, Labour leadership crisis) | **Null result.** No effect survives Benjamini-Hochberg correction. Closest raw effect (Covid-19 sentiment) points the *opposite* direction to the hypothesis. |
+| **H3** - The crisis effect differs by governing party | OLS interaction term (pooled any-crisis x party, PM fixed effects), BH-corrected | **Null result**, and underpowered by construction - the Labour side is identified from a single crisis under a single PM. Flagged as a data-scope limitation in `PHASE0_SCOPING.md` before the corpus was even built. |
+| **H4** - Topics drift continuously, with breaks at PM transitions (exploratory) | LDA (K=14) topic weights over time | Descriptive, not a formal test - see the dashboard's Topics tab and `phase5_lda_report.md`. |
+
+Full statistical detail, caveats, and known limitations are in each phase's report under `data/processed/` - see the Pipeline table below.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[Hansard API] --> C[hansard-pm-extraction]
+    B[Members API] --> C
+    C --> D["Parquet corpus\n(data_README.md + schema.json)"]
+    D --> E[hansard-pm-nlp]
+    E --> F1["Lexical baseline\n(Phase 3)"]
+    E --> F2["Sentiment / hedging\n(Phase 4)"]
+    E --> F3["Topic modeling: LDA vs BERTopic\n(Phase 5)"]
+    E --> F4["PM classifier: H1\n(Phase 6)"]
+    E --> F5["Event study: H2, H3\n(Phase 7)"]
+    F1 --> G[Streamlit dashboard]
+    F2 --> G
+    F3 --> G
+    F4 --> G
+    F5 --> G
+```
+
 ## Pipeline
 
 Each stage is a standalone module, runnable independently, writing its output to `data/processed/` alongside a markdown report.
@@ -36,6 +69,13 @@ streamlit run app/app.py
 ```
 
 Four tabs: stylometric profile by PM, sentiment/certainty over time (with crisis windows), LDA topics over time, and the PM-attribution classifier's results. Filters (PM, date range) apply per tab, scoped to what the underlying data supports - see the in-app captions.
+
+The dashboard only reads precomputed artifacts from `data/processed/` (parquet/CSV) and the already-trained LDA model - it never calls `sentiment.py`, `bertopic_model.py`, `classifier.py`, or `style_features.py` at runtime. For deployment, install `requirements-app.txt` instead of the full `pyproject.toml`: it skips torch/transformers/bertopic/spacy entirely, which this dashboard doesn't need.
+
+```bash
+pip install -r requirements-app.txt
+streamlit run app/app.py
+```
 
 ## Setup
 

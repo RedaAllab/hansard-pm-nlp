@@ -1,0 +1,12 @@
+# Dashboard-only dependencies (Phase 8, app/app.py). Deliberately NOT
+# pyproject.toml's full dependency list: the dashboard reads precomputed
+# parquet/CSV artifacts from data/processed/ and loads the already-trained
+# LDA model - it never calls sentiment.py, bertopic_model.py, classifier.py,
+# or style_features.py at runtime, so it needs neither torch, transformers,
+# bertopic, nor spacy. Used for lightweight deployment (Streamlit Community
+# Cloud); local development still uses `pip install -e ".[dev]"`.
+streamlit>=1.38
+plotly>=5.22
+pandas>=2.2
+pyarrow>=16.0
+gensim>=4.3
