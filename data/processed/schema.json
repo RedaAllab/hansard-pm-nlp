@@ -1,0 +1,24 @@
+{
+  "table": "pm_contributions_clean",
+  "columns": {
+    "pm_name": "str",
+    "pm_party": "str",
+    "member_id": "int64",
+    "item_id": "int64",
+    "contribution_ext_id": "str",
+    "contribution_text": "str",
+    "hansard_section": "str",
+    "debate_section": "str",
+    "debate_section_id": "int64",
+    "debate_section_ext_id": "str",
+    "sitting_date": "datetime64[us]",
+    "section": "str",
+    "house": "str",
+    "order_in_debate_section": "int64",
+    "debate_section_order": "int64",
+    "ingested_at": "datetime64[us, UTC]",
+    "contribution_text_raw": "str",
+    "is_pmqs": "bool"
+  },
+  "row_count": 10673
+}
