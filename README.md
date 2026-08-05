@@ -70,12 +70,14 @@ streamlit run app/app.py
 
 Four tabs: stylometric profile by PM, sentiment/certainty over time (with crisis windows), LDA topics over time, and the PM-attribution classifier's results. Filters (PM, date range) apply per tab, scoped to what the underlying data supports - see the in-app captions.
 
-The dashboard only reads precomputed artifacts from `data/processed/` (parquet/CSV) and the already-trained LDA model - it never calls `sentiment.py`, `bertopic_model.py`, `classifier.py`, or `style_features.py` at runtime. For deployment, install `requirements-app.txt` instead of the full `pyproject.toml`: it skips torch/transformers/bertopic/spacy entirely, which this dashboard doesn't need.
+The dashboard only reads precomputed artifacts from `data/processed/` (parquet/CSV) and the already-trained LDA model - it never calls `sentiment.py`, `bertopic_model.py`, `classifier.py`, or `style_features.py` at runtime, so `requirements-app.txt` (streamlit, plotly, pandas, pyarrow, gensim only) is enough to run it:
 
 ```bash
 pip install -r requirements-app.txt
 streamlit run app/app.py
 ```
+
+**Note on Streamlit Community Cloud specifically**: it detects `pyproject.toml` at the repo root and installs the full dependency set via Poetry regardless of `requirements-app.txt` - there is no working override for this. The practical effect is a slower build (torch, transformers, bertopic, and spacy all get installed even though the dashboard never imports them), not a broken one; `requires-python` is capped at `<3.14` in `pyproject.toml` so Poetry's resolver doesn't pick a Python version spacy doesn't support yet. `requirements-app.txt` still documents the dashboard's true minimal footprint and works as expected on hosts that respect `requirements.txt` (Render, Railway, etc.).
 
 ## Setup
 

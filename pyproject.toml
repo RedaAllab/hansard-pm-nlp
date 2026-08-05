@@ -2,7 +2,7 @@
 name = "hansard-pm-nlp"
 version = "0.1.0"
 description = "NLP analysis of UK PM Hansard rhetoric: cleaning, feature layers, modeling, dashboard."
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "pandas>=2.2",
     "pyarrow>=16.0",
