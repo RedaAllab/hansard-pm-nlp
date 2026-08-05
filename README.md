@@ -62,6 +62,18 @@ python -m hansard_pm_nlp.build_event_study
 
 Later stages depend on earlier stages' output already existing in `data/processed/`.
 
+## Notebooks
+
+`notebooks/` holds exploratory analysis that goes past each phase's summary report - full distributions instead of single means, face-validity checks on the sentiment/hedging scores, and sanity checks re-derived independently rather than trusted from a (possibly stale) report. All logic is imported from `src/hansard_pm_nlp/` per `CLAUDE.md` §6; nothing is redefined in-notebook.
+
+| Notebook | Covers |
+|---|---|
+| `01_corpus_overview.ipynb` | Volume/PMQs split by PM, contribution-length distribution, sitting calendar, re-derived duplicate-row check |
+| `02_lexical_deep_dive.ipynb` | Full readability/sentence-length distributions, a direct visual demonstration of TTR's length bias (why MTLD was chosen), full n-gram/TF-IDF tables |
+| `03_sentiment_validation.ipynb` | VADER vs. transformer disagreement rate and real disagreement examples (two distinct, genre-specific failure modes, not "one method is better"), hedging lexicon spot-check, the PMQs hedging paradox from `affect.py` |
+
+Outputs are committed (charts render directly on GitHub). To re-run: `pip install -e ".[dev]"` (adds jupyter/matplotlib/seaborn on top of the base deps), then `jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb`.
+
 ## Dashboard
 
 ```bash

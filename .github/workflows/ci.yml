@@ -28,3 +28,11 @@ jobs:
 
       - name: Test
         run: pytest
+
+      - name: Notebooks execute cleanly
+        run: |
+          python -m ipykernel install --user --name ci-kernel
+          jupyter nbconvert --to notebook --execute --stdout \
+            --ExecutePreprocessor.kernel_name=ci-kernel \
+            --ExecutePreprocessor.timeout=300 \
+            notebooks/*.ipynb > /dev/null
