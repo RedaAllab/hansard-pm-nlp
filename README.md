@@ -2,7 +2,7 @@
 
 NLP analysis of UK Prime Ministers' rhetoric (2019-present), built on the parquet corpus produced by [`hansard-pm-extraction`](https://github.com/RedaAllab/hansard-pm-extraction). Second stage of a two-repository project; see that repo's `PROJECT_SUMMARY.md` for the full project (research question, hypotheses, roadmap) and `CLAUDE.md` for conventions.
 
-**[Live dashboard](#) - link added once deployed** · Four Prime Ministers (Johnson, Truss, Sunak, Starmer), 291 Commons sittings, four layered NLP analyses, tested against four pre-registered hypotheses.
+**[Live dashboard](https://hansard-pm-nlp-nhenez39aujxgtejnyjvrg.streamlit.app)** · Four Prime Ministers (Johnson, Truss, Sunak, Starmer), 291 Commons sittings, four layered NLP analyses, tested against four pre-registered hypotheses.
 
 ## Results by hypothesis
 
@@ -77,7 +77,7 @@ pip install -r requirements-app.txt
 streamlit run app/app.py
 ```
 
-**Note on Streamlit Community Cloud specifically**: it detects `pyproject.toml` at the repo root and installs the full dependency set via Poetry regardless of `requirements-app.txt` - there is no working override for this. The practical effect is a slower build (torch, transformers, bertopic, and spacy all get installed even though the dashboard never imports them), not a broken one; `requires-python` is capped at `<3.14` in `pyproject.toml` so Poetry's resolver doesn't pick a Python version spacy doesn't support yet. `requirements-app.txt` still documents the dashboard's true minimal footprint and works as expected on hosts that respect `requirements.txt` (Render, Railway, etc.).
+**Note on Streamlit Community Cloud specifically**: it detects `pyproject.toml` at the repo root and installs the full dependency set via Poetry regardless of `requirements-app.txt` - there is no working override for this. The practical effect is a slower build (torch, transformers, bertopic, and spacy all get installed even though the dashboard never imports them), not a broken one - as long as the Python version is compatible. Two things were needed to get a working deploy: `requires-python` capped at `<3.14` in `pyproject.toml` (spacy doesn't support 3.14+ yet), *and* explicitly selecting Python 3.12 in the app's Streamlit Cloud settings (General → Python version) - the platform's default interpreter at deploy time was 3.14.6, and `requires-python` alone doesn't make Poetry switch interpreters, only validates against whichever one is already active. `requirements-app.txt` still documents the dashboard's true minimal footprint and works as expected on hosts that respect `requirements.txt` (Render, Railway, etc.).
 
 ## Setup
 
