@@ -13,6 +13,7 @@ dependencies = [
     "torch>=2.2",
     "gensim>=4.3",
     "bertopic>=0.16",
+    "spacy>=3.7",
 ]
 
 [project.optional-dependencies]
