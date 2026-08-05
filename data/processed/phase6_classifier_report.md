@@ -1,6 +1,6 @@
 # Phase 6 - PM-attribution classifier
 
-Generated: 2026-08-05T21:30:48.588674+00:00
+Generated: 2026-08-05T21:51:48.973247+00:00
 
 Tests H1: 'a supervised classifier can attribute an anonymized speech excerpt to the correct PM at a rate significantly above chance' (CLAUDE.md). Document unit: one document per (PM, sitting date), same as Phase 5.
 
@@ -24,7 +24,7 @@ Lexical diversity (TTR, MTLD), readability (Flesch-Kincaid, mean words/sentence)
 | Model | Accuracy | Macro F1 |
 |---|---|---|
 | Logistic regression | 0.915 | 0.918 |
-| HistGradientBoosting | 0.949 | 0.943 |
+| HistGradientBoosting | 0.932 | 0.926 |
 
 ## Confusion matrix - logistic regression
 
@@ -38,7 +38,7 @@ Lexical diversity (TTR, MTLD), readability (Flesch-Kincaid, mean words/sentence)
 
 | actual \ predicted | Boris Johnson | Keir Starmer | Rishi Sunak |
 |---|---|---|---|
-| Boris Johnson | 28 | 0 | 1 |
+| Boris Johnson | 27 | 0 | 2 |
 | Keir Starmer | 1 | 16 | 0 |
 | Rishi Sunak | 0 | 1 | 12 |
 
@@ -59,25 +59,25 @@ Model-agnostic (permutation_importance on the test set), so both models are rank
 - fw_but: 0.0057
 - fw_were: 0.0051
 - pos_INTJ: 0.0044
-- fw_they: 0.0044
 - fw_to: 0.0044
-- fw_i: 0.0033
+- fw_they: 0.0044
 - pos_ADJ: 0.0033
+- fw_i: 0.0033
 
 ### HistGradientBoosting
 
-- mean_words_per_sentence: 0.0536
-- pos_INTJ: 0.0488
-- hedge_rate: 0.0485
-- fw_so: 0.0326
-- fw_of: 0.0286
-- fw_what: 0.0238
-- pos_PROPN: 0.0230
-- fw_because: 0.0158
-- fw_must: 0.0131
-- fw_to: 0.0131
-- mtld: 0.0130
-- fw_a: 0.0128
-- pos_PART: 0.0105
-- pos_NOUN: 0.0105
-- fw_i: 0.0104
+- pos_INTJ: 0.0414
+- hedge_rate: 0.0394
+- fw_so: 0.0358
+- mtld: 0.0234
+- mean_words_per_sentence: 0.0223
+- fw_of: 0.0222
+- fw_for: 0.0205
+- fw_a: 0.0178
+- fw_what: 0.0174
+- fw_shall: 0.0137
+- pos_PROPN: 0.0129
+- fw_if: 0.0122
+- fw_which: 0.0084
+- fw_from: 0.0084
+- net_certainty: 0.0084

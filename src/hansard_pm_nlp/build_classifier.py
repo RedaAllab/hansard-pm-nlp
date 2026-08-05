@@ -162,10 +162,30 @@ def main() -> None:
     )
     all_features.to_parquet(PROCESSED_DIR / "pm_style_features.parquet", index=False)
 
+    # Dashboard (Phase 8) reads these directly rather than retraining sklearn
+    # models on every page load.
+    predictions = test_docs[["pm_name", "sitting_date"]].reset_index(drop=True)
+    predictions["pred_logreg"] = logreg.predict(X_test)
+    predictions["pred_hgb"] = hgb.predict(X_test)
+    predictions.to_csv(PROCESSED_DIR / "phase6_test_predictions.csv", index=False)
+
+    pd.DataFrame(logreg_importance, columns=["feature", "importance"]).to_csv(
+        PROCESSED_DIR / "phase6_feature_importance_logreg.csv", index=False
+    )
+    pd.DataFrame(hgb_importance, columns=["feature", "importance"]).to_csv(
+        PROCESSED_DIR / "phase6_feature_importance_hgb.csv", index=False
+    )
+    pd.DataFrame(
+        [
+            {"model": "logreg", **{k: v for k, v in logreg_result.items() if k in ("accuracy", "macro_f1")}},
+            {"model": "hgb", **{k: v for k, v in hgb_result.items() if k in ("accuracy", "macro_f1")}},
+        ]
+    ).to_csv(PROCESSED_DIR / "phase6_metrics.csv", index=False)
+
     print(f"Logistic regression: accuracy={logreg_result['accuracy']:.3f}, macro_f1={logreg_result['macro_f1']:.3f}")
     print(f"HistGradientBoosting: accuracy={hgb_result['accuracy']:.3f}, macro_f1={hgb_result['macro_f1']:.3f}")
     print(f"Chance baselines: {baselines}")
-    print("Wrote phase6_classifier_report.md, pm_style_features.parquet")
+    print("Wrote phase6_classifier_report.md, pm_style_features.parquet, phase6_test_predictions.csv")
 
 
 if __name__ == "__main__":
