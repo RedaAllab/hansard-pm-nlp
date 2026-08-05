@@ -92,7 +92,9 @@ def evaluate(model, X_test: pd.DataFrame, y_test: pd.Series) -> dict:
     }
 
 
-def feature_importance(model, X_test: pd.DataFrame, y_test: pd.Series, top_k: int = 15) -> list[tuple[str, float]]:
+def feature_importance(
+    model, X_test: pd.DataFrame, y_test: pd.Series, top_k: int = 15
+) -> list[tuple[str, float]]:
     """Permutation importance (model-agnostic) rather than model-specific
     attributes, so logistic regression and gradient boosting are compared
     the same way.

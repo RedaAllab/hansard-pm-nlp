@@ -38,7 +38,11 @@ def _format_table(df: pd.DataFrame, columns: list[str]) -> list[str]:
 
 
 def write_report(
-    h2_effects: pd.DataFrame, h3_effects: pd.DataFrame, crisis_counts: dict[str, int], n_docs: int, path: Path
+    h2_effects: pd.DataFrame,
+    h3_effects: pd.DataFrame,
+    crisis_counts: dict[str, int],
+    n_docs: int,
+    path: Path,
 ) -> None:
     generated_at = dt.datetime.now(dt.UTC).isoformat()
     lines = [
@@ -145,10 +149,10 @@ def main() -> None:
     )
     h3_effects = add_bh_correction(h3_effects)
 
-    crisis_counts = {
-        name: int(docs[f"crisis_{name}"].sum()) for name in ["covid19", "mini_budget", "ukraine_invasion", "labour_leadership_crisis"]
-    }
-    write_report(h2_effects, h3_effects, crisis_counts, len(docs), PROCESSED_DIR / "phase7_event_study_report.md")
+    crisis_names = ["covid19", "mini_budget", "ukraine_invasion", "labour_leadership_crisis"]
+    crisis_counts = {name: int(docs[f"crisis_{name}"].sum()) for name in crisis_names}
+    report_path = PROCESSED_DIR / "phase7_event_study_report.md"
+    write_report(h2_effects, h3_effects, crisis_counts, len(docs), report_path)
 
     docs.to_parquet(PROCESSED_DIR / "event_study_dataset.parquet", index=False)
     h2_effects.to_csv(PROCESSED_DIR / "phase7_h2_effects.csv", index=False)

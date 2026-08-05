@@ -7,7 +7,8 @@ def _toy_docs():
     rows = []
     for pm, n in [("Boris Johnson", 10), ("Rishi Sunak", 10), ("Liz Truss", 5)]:
         for i in range(n):
-            rows.append({"pm_name": pm, "sitting_date": pd.Timestamp("2020-01-01") + pd.Timedelta(days=i)})
+            date = pd.Timestamp("2020-01-01") + pd.Timedelta(days=i)
+            rows.append({"pm_name": pm, "sitting_date": date})
     return pd.DataFrame(rows)
 
 

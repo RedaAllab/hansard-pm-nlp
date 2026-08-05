@@ -90,7 +90,8 @@ def write_report(
         "",
         "| Model | Accuracy | Macro F1 |",
         "|---|---|---|",
-        f"| Logistic regression | {logreg_result['accuracy']:.3f} | {logreg_result['macro_f1']:.3f} |",
+        f"| Logistic regression | {logreg_result['accuracy']:.3f} | "
+        f"{logreg_result['macro_f1']:.3f} |",
         f"| HistGradientBoosting | {hgb_result['accuracy']:.3f} | {hgb_result['macro_f1']:.3f} |",
         "",
         "## Confusion matrix - logistic regression",
@@ -155,11 +156,11 @@ def main() -> None:
         PROCESSED_DIR / "phase6_classifier_report.md",
     )
 
-    all_features = pd.concat([train_features.assign(split="train"), test_features.assign(split="test")])
     all_features = pd.concat(
-        [pd.concat([train_docs, test_docs]).reset_index(drop=True)[["sitting_date"]], all_features.reset_index(drop=True)],
-        axis=1,
+        [train_features.assign(split="train"), test_features.assign(split="test")]
     )
+    all_dates = pd.concat([train_docs, test_docs]).reset_index(drop=True)[["sitting_date"]]
+    all_features = pd.concat([all_dates, all_features.reset_index(drop=True)], axis=1)
     all_features.to_parquet(PROCESSED_DIR / "pm_style_features.parquet", index=False)
 
     # Dashboard (Phase 8) reads these directly rather than retraining sklearn
@@ -175,17 +176,27 @@ def main() -> None:
     pd.DataFrame(hgb_importance, columns=["feature", "importance"]).to_csv(
         PROCESSED_DIR / "phase6_feature_importance_hgb.csv", index=False
     )
+    metric_keys = ("accuracy", "macro_f1")
     pd.DataFrame(
         [
-            {"model": "logreg", **{k: v for k, v in logreg_result.items() if k in ("accuracy", "macro_f1")}},
-            {"model": "hgb", **{k: v for k, v in hgb_result.items() if k in ("accuracy", "macro_f1")}},
+            {"model": "logreg", **{k: v for k, v in logreg_result.items() if k in metric_keys}},
+            {"model": "hgb", **{k: v for k, v in hgb_result.items() if k in metric_keys}},
         ]
     ).to_csv(PROCESSED_DIR / "phase6_metrics.csv", index=False)
 
-    print(f"Logistic regression: accuracy={logreg_result['accuracy']:.3f}, macro_f1={logreg_result['macro_f1']:.3f}")
-    print(f"HistGradientBoosting: accuracy={hgb_result['accuracy']:.3f}, macro_f1={hgb_result['macro_f1']:.3f}")
+    print(
+        f"Logistic regression: accuracy={logreg_result['accuracy']:.3f}, "
+        f"macro_f1={logreg_result['macro_f1']:.3f}"
+    )
+    print(
+        f"HistGradientBoosting: accuracy={hgb_result['accuracy']:.3f}, "
+        f"macro_f1={hgb_result['macro_f1']:.3f}"
+    )
     print(f"Chance baselines: {baselines}")
-    print("Wrote phase6_classifier_report.md, pm_style_features.parquet, phase6_test_predictions.csv")
+    print(
+        "Wrote phase6_classifier_report.md, pm_style_features.parquet, "
+        "phase6_test_predictions.csv"
+    )
 
 
 if __name__ == "__main__":

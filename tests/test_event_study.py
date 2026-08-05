@@ -62,7 +62,9 @@ def test_build_sitting_dataset_drops_short_sittings():
 def test_add_crisis_dummies_flags_covid_window():
     docs = build_sitting_dataset(_toy_contributions())
     docs = add_crisis_dummies(docs)
-    johnson_covid_row = docs[(docs["pm_name"] == "Boris Johnson") & (docs["sitting_date"] == "2020-04-01")]
+    is_johnson = docs["pm_name"] == "Boris Johnson"
+    is_covid_date = docs["sitting_date"] == "2020-04-01"
+    johnson_covid_row = docs[is_johnson & is_covid_date]
     assert johnson_covid_row["crisis_covid19"].iloc[0]
     assert johnson_covid_row["any_crisis"].iloc[0]
 

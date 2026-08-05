@@ -26,7 +26,13 @@ CRISIS_WINDOWS = {
     "labour_leadership_crisis": ("2026-05-07", "2026-07-20"),
 }
 
-AFFECT_COLUMNS = ["vader_compound", "transformer_score", "hedge_rate", "booster_rate", "net_certainty"]
+AFFECT_COLUMNS = [
+    "vader_compound",
+    "transformer_score",
+    "hedge_rate",
+    "booster_rate",
+    "net_certainty",
+]
 
 
 def build_sitting_dataset(df: pd.DataFrame) -> pd.DataFrame:

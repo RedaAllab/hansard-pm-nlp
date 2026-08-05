@@ -207,7 +207,10 @@ with tab_affect:
             )
         )
     for name, (start, end) in CRISIS_WINDOWS.items():
-        if pd.Timestamp(end) >= pd.Timestamp(date_range[0]) and pd.Timestamp(start) <= pd.Timestamp(date_range[1]):
+        in_view = pd.Timestamp(end) >= pd.Timestamp(date_range[0]) and pd.Timestamp(
+            start
+        ) <= pd.Timestamp(date_range[1])
+        if in_view:
             fig.add_vrect(
                 x0=start,
                 x1=end,
@@ -234,7 +237,11 @@ with tab_topics:
     _, top_words = load_lda_model()
     topics_df = load_lda_topics()
     topic_cols = [c for c in topics_df.columns if c.startswith("topic_")]
-    topic_labels = {c: f"T{c.removeprefix('topic_')}: " + ", ".join(top_words[int(c.removeprefix('topic_'))][:3]) for c in topic_cols}
+    topic_labels = {
+        c: f"T{c.removeprefix('topic_')}: "
+        + ", ".join(top_words[int(c.removeprefix("topic_"))][:3])
+        for c in topic_cols
+    }
 
     pms_present = topics_df["pm_name"].unique().tolist()
     selected = st.multiselect("PMs", pms_present, default=pms_present, key="topic_pms")
@@ -292,9 +299,16 @@ with tab_classifier:
             f"{metrics.loc[metrics['model'] == 'hgb', 'accuracy'].iloc[0]:.1%}",
         )
 
-    model_choice = st.radio("Model", ["pred_logreg", "pred_hgb"], format_func=lambda x: x.removeprefix("pred_"), horizontal=True)
+    model_choice = st.radio(
+        "Model",
+        ["pred_logreg", "pred_hgb"],
+        format_func=lambda x: x.removeprefix("pred_"),
+        horizontal=True,
+    )
     labels = sorted(predictions["pm_name"].unique())
-    cm = pd.crosstab(predictions["pm_name"], predictions[model_choice]).reindex(index=labels, columns=labels, fill_value=0)
+    cm = pd.crosstab(predictions["pm_name"], predictions[model_choice]).reindex(
+        index=labels, columns=labels, fill_value=0
+    )
 
     fig = px.imshow(
         cm,
@@ -306,6 +320,12 @@ with tab_classifier:
     st.plotly_chart(_dark(fig), use_container_width=True)
 
     fi = fi_logreg if model_choice == "pred_logreg" else fi_hgb
-    fig2 = px.bar(fi.sort_values("importance"), x="importance", y="feature", orientation="h", title="Top 15 features (permutation importance)")
+    fig2 = px.bar(
+        fi.sort_values("importance"),
+        x="importance",
+        y="feature",
+        orientation="h",
+        title="Top 15 features (permutation importance)",
+    )
     fig2.update_layout(height=500)
     st.plotly_chart(_dark(fig2), use_container_width=True)

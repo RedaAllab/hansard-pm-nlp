@@ -1,6 +1,6 @@
 # Phase 6 - PM-attribution classifier
 
-Generated: 2026-08-05T21:51:48.973247+00:00
+Generated: 2026-08-05T22:19:08.640497+00:00
 
 Tests H1: 'a supervised classifier can attribute an anonymized speech excerpt to the correct PM at a rate significantly above chance' (CLAUDE.md). Document unit: one document per (PM, sitting date), same as Phase 5.
 
@@ -62,7 +62,7 @@ Model-agnostic (permutation_importance on the test set), so both models are rank
 - fw_to: 0.0044
 - fw_they: 0.0044
 - pos_ADJ: 0.0033
-- fw_i: 0.0033
+- pos_DET: 0.0033
 
 ### HistGradientBoosting
 
@@ -78,6 +78,6 @@ Model-agnostic (permutation_importance on the test set), so both models are rank
 - fw_shall: 0.0137
 - pos_PROPN: 0.0129
 - fw_if: 0.0122
-- fw_which: 0.0084
 - fw_from: 0.0084
+- fw_which: 0.0084
 - net_certainty: 0.0084

@@ -1,6 +1,6 @@
 # Phase 7 - Event-study regressions
 
-Generated: 2026-08-05T21:41:45.920971+00:00
+Generated: 2026-08-05T22:19:16.166118+00:00
 
 Tests H2 (crisis affect) and H3 (party interaction) per CLAUDE.md §2. Unit: one row per (PM, sitting date), 296 sittings after the 50-word floor (event_study.py) - unlike Phase 6's classifier, Liz Truss is included here, since her tenure is the only one overlapping the mini-budget crisis window.
 
