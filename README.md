@@ -82,6 +82,8 @@ streamlit run app/app.py
 
 Four tabs: stylometric profile by PM, sentiment/certainty over time (with crisis windows), LDA topics over time, and the PM-attribution classifier's results. Filters (PM, date range) apply per tab, scoped to what the underlying data supports - see the in-app captions.
 
+`.streamlit/config.toml` pins `theme.base = "dark"`. Without it Streamlit follows the *viewer's* OS/browser color-scheme preference, and every chart's Plotly styling (`_dark()` in `app.py`) assumes a dark canvas - a light-mode viewer would get Plotly's pastel qualitative palette on a white background instead of the intended dark theme, which is illegible on some charts (this is what produced washed-out screenshots during development). Pinning the theme makes the dashboard look the same for every viewer regardless of their system settings.
+
 The dashboard only reads precomputed artifacts from `data/processed/` (parquet/CSV) and the already-trained LDA model - it never calls `sentiment.py`, `bertopic_model.py`, `classifier.py`, or `style_features.py` at runtime, so `requirements-app.txt` (streamlit, plotly, pandas, pyarrow, gensim only) is enough to run it:
 
 ```bash
