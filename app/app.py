@@ -29,6 +29,7 @@ from hansard_pm_nlp.dashboard_helpers import (  # noqa: E402
     confusion_cell_detail,
     crisis_baseline_split,
     crisis_party_split,
+    merge_overlapping_topics,
     normalize_radar,
     parse_tfidf_terms,
     pmqs_split_by_pm,
@@ -167,18 +168,19 @@ with tab_overview:
             "(0=lowest, 1=highest among them) - deselect a PM below to "
             "rescale the others rather than leaving the axes compressed by "
             "a PM that's no longer even drawn. Legend shows each PM's "
-            "contribution count: Liz Truss's is a fifth to a fortieth of "
-            "the others (5 documents/49-day tenure), so her line is more "
-            "sample-size noise than settled style - read it with that in "
-            "mind. Type-token ratio (TTR) is left off entirely - it is "
-            "length-biased (lexical.py) and Truss's tiny corpus (8,842 "
-            "words vs 220k-520k) makes her TTR purely an artifact of "
-            "sample size; MTLD is the length-corrected alternative shown "
-            "here. TTR is still in the raw values table below."
+            "contribution count: Liz Truss's is 123 vs. 2,195-5,459 for "
+            "the other three (a seventeenth to a forty-fourth), over her "
+            "49-day tenure, so her line is more sample-size noise than "
+            "settled style - read it with that in mind. Type-token ratio "
+            "(TTR) is left off entirely - it is length-biased (lexical.py) "
+            "and Truss's tiny corpus (8,842 words vs 220k-520k) makes her "
+            "TTR purely an artifact of sample size; MTLD is the length-"
+            "corrected alternative shown here. TTR is in the raw values "
+            "table below."
         )
 
     with st.expander("Raw values"):
-        st.dataframe(profile[["pm_name", *cols]].set_index("pm_name"))
+        st.dataframe(profile[["pm_name", *cols, "type_token_ratio"]].set_index("pm_name"))
 
     st.subheader("Distinctive terms per PM (TF-IDF)")
     st.caption(
@@ -287,6 +289,14 @@ with tab_affect:
         crisis_choice = st.selectbox(
             "Crisis (H2)", list(CRISIS_WINDOWS), format_func=lambda x: x.replace("_", " ")
         )
+        if crisis_choice == "mini_budget":
+            st.caption(
+                "Mini-budget is a single sitting in this corpus (Liz Truss, "
+                "2022-10-12) - the 'Crisis' box below is one point, not a "
+                "distribution. phase7_event_study_report.md treats this "
+                "window as uninterpretable given available data, not as "
+                "evidence against H2 specifically."
+            )
         split_h2 = crisis_baseline_split(box_df, f"crisis_{crisis_choice}", dv_choice)
         fig_h2 = px.box(split_h2, x="period", y="value", color="period", points="all")
         fig_h2.update_layout(height=420, showlegend=False, yaxis_title=dv_choice)
@@ -300,11 +310,13 @@ with tab_affect:
 
     st.caption(
         "Phase 7: no effect survives Benjamini-Hochberg correction for "
-        "either H2 or H3 - these boxes are why, heavy overlap between "
-        "crisis and baseline in every case. H3 is additionally "
-        "underpowered by construction: Labour's crisis side here is a "
-        "single crisis window under a single PM (9 sittings vs. 79 for the "
-        "Conservative side)."
+        "either H2 or H3. For Covid-19, Ukraine invasion, and the Labour "
+        "leadership crisis, these boxes show why - heavy overlap between "
+        "crisis and baseline. Mini-budget is a different problem, not "
+        "overlap (see the note above when it's selected). H3 is "
+        "additionally underpowered by construction: Labour's crisis side "
+        "here is a single crisis window under a single PM (9 sittings vs. "
+        "79 for the Conservative side)."
     )
 
     st.subheader("PMQs vs. other debates")
@@ -316,7 +328,11 @@ with tab_affect:
         "other debates corpus-wide, which may mean the lexicon misses "
         "PMQs-specific evasion (redirecting to the other party) rather than "
         "PMs being less evasive there. Below: does that hold for every PM, "
-        "or is it driven by one of them?"
+        "or is it driven by one of them? Hover a bar for its N - Liz "
+        "Truss's PMQs/other split is far thinner than the other three PMs' "
+        "(dozens vs. thousands of contributions per group), so treat any "
+        "reversal for her as sample-size noise before reading it as a "
+        "genre effect."
     )
     pmqs_metric = st.radio(
         "Metric",
@@ -338,6 +354,7 @@ with tab_affect:
         y=pmqs_metric,
         color="Debate type",
         barmode="group",
+        hover_data={"n_contributions": True},
     )
     fig_pmqs.update_layout(height=420, xaxis_title="", yaxis_title=pmqs_metric)
     st.plotly_chart(_dark(fig_pmqs), width="stretch")
@@ -376,9 +393,7 @@ with tab_topics:
     selected = st.multiselect("PMs", pms_present, default=pms_present, key="topic_pms")
     filtered = topics_df[topics_df["pm_name"].isin(selected)].sort_values("sitting_date")
 
-    merged = filtered[topic_cols].copy()
-    merged[MERGED_LABEL] = merged["topic_0"] + merged["topic_1"]
-    merged = merged.drop(columns=["topic_0", "topic_1"]).rename(columns=topic_labels)
+    merged = merge_overlapping_topics(filtered[topic_cols], topic_labels, MERGED_LABEL)
     merged["sitting_date"] = filtered["sitting_date"].values
 
     monthly = merged.set_index("sitting_date").resample("MS").mean().dropna(how="all")
@@ -425,15 +440,15 @@ with tab_topics:
     st.caption(
         "Same 13 merged topics, averaged across each PM's sittings instead "
         "of over time - a cross-sectional complement to the area chart "
-        "above: which topics a PM leans into overall, not when."
+        "above: which topics a PM leans into overall, not when. Row labels "
+        "show each PM's sitting count - Liz Truss's row averages far fewer "
+        "sittings than the other three, so read her cells as noisier."
     )
-    cross_sectional = filtered[topic_cols].copy()
-    cross_sectional[MERGED_LABEL] = cross_sectional["topic_0"] + cross_sectional["topic_1"]
-    cross_sectional = cross_sectional.drop(columns=["topic_0", "topic_1"]).rename(
-        columns=topic_labels
-    )
+    cross_sectional = merge_overlapping_topics(filtered[topic_cols], topic_labels, MERGED_LABEL)
     cross_sectional["pm_name"] = filtered["pm_name"].values
     pm_topic_means = cross_sectional.groupby("pm_name").mean()
+    n_sittings = filtered.groupby("pm_name").size()
+    pm_topic_means.index = [f"{pm} (n={n_sittings[pm]})" for pm in pm_topic_means.index]
 
     fig_heat = px.imshow(
         pm_topic_means,

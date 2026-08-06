@@ -14,8 +14,9 @@ def normalize_radar(
     """Min-max normalize each stylometric column across only `selected_pms`.
 
     Scoping the min/max to the current selection - rather than the full
-    profile - means deselecting an outlier PM (e.g. Liz Truss, n=5
-    contributions) actually rescales the remaining axes instead of leaving
+    profile - means deselecting an outlier PM (e.g. Liz Truss, n=123
+    contributions vs. 2,195-5,459 for the other three) actually rescales
+    the remaining axes instead of leaving
     them compressed by a PM that isn't even drawn anymore. A column where
     every selected PM ties (including the single-PM-selected case, where
     every column trivially ties) would otherwise divide by zero; those are
@@ -44,7 +45,7 @@ def parse_tfidf_terms(term_string: str) -> list[tuple[str, float]]:
     into (term, score) pairs, in the descending-score order eda.py wrote
     them in.
     """
-    if not term_string:
+    if pd.isna(term_string) or not term_string:
         return []
     pairs = []
     for item in term_string.split("; "):
@@ -68,6 +69,16 @@ def pmqs_split_by_pm(scored: pd.DataFrame) -> pd.DataFrame:
     debate type (PMQs vs. other) within each PM, to check whether the
     PMQs-hedges-*less* paradox (affect.py, affect_report.md, whole-corpus)
     holds for every PM individually or is driven by one of them.
+
+    Deliberately not calling affect.build_pmqs_split(scored, ...) here even
+    though the aggregation is otherwise identical plus a groupby key:
+    affect.py imports sentiment.py, which imports vaderSentiment at module
+    level - a dependency requirements-app.txt (the dashboard's lightweight
+    deploy path) doesn't include, since the dashboard never calls
+    sentiment.py/affect.py at runtime (see README's "Dashboard" section).
+    Importing affect.py from here would silently pull that dependency back
+    into the dashboard's import graph. If affect.build_pmqs_split's
+    aggregation ever changes, update this one to match.
     """
     agg = scored.groupby(["pm_name", "is_pmqs"]).agg(
         n_contributions=("contribution_text", "size"),
@@ -75,6 +86,21 @@ def pmqs_split_by_pm(scored: pd.DataFrame) -> pd.DataFrame:
         mean_net_certainty=("net_certainty", "mean"),
     )
     return agg.reset_index()
+
+
+def merge_overlapping_topics(
+    topic_df: pd.DataFrame, topic_labels: dict[str, str], merged_label: str
+) -> pd.DataFrame:
+    """Sum the one documented near-duplicate LDA topic pair (0 and 1, both
+    Ukraine/Russia/security - phase5_lda_report.md) into a single column and
+    rename the rest via `topic_labels`. Shared by the topics-over-time area
+    chart and the mean-topic-weight-by-PM heatmap so both always agree on
+    which topics are merged and how they're labeled, instead of each tab
+    carrying its own copy of the merge that could drift out of sync.
+    """
+    merged = topic_df.copy()
+    merged[merged_label] = merged["topic_0"] + merged["topic_1"]
+    return merged.drop(columns=["topic_0", "topic_1"]).rename(columns=topic_labels)
 
 
 def crisis_party_split(event_df: pd.DataFrame, metric_col: str) -> pd.DataFrame:

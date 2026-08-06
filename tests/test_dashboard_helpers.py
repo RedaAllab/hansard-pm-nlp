@@ -1,9 +1,11 @@
 import pandas as pd
+import pytest
 
 from hansard_pm_nlp.dashboard_helpers import (
     confusion_cell_detail,
     crisis_baseline_split,
     crisis_party_split,
+    merge_overlapping_topics,
     normalize_radar,
     parse_tfidf_terms,
     pmqs_split_by_pm,
@@ -78,6 +80,12 @@ def test_parse_tfidf_terms_empty_string():
     assert parse_tfidf_terms("") == []
 
 
+def test_parse_tfidf_terms_nan_returns_empty_list():
+    # A missing top_tfidf_terms cell reads back from CSV as float('nan'),
+    # not "" - both must resolve to no terms rather than raising.
+    assert parse_tfidf_terms(float("nan")) == []
+
+
 def _toy_event_df():
     return pd.DataFrame(
         {
@@ -93,6 +101,15 @@ def test_crisis_baseline_split_labels_periods():
     split = crisis_baseline_split(_toy_event_df(), "crisis_covid19", "vader_compound")
     assert split["period"].tolist() == ["Crisis", "Baseline", "Baseline", "Baseline"]
     assert split["value"].tolist() == [0.1, 0.2, 0.3, 0.4]
+
+
+def test_crisis_baseline_split_all_one_category():
+    # Real, easily reachable in the dashboard: deselecting the one PM whose
+    # tenure overlaps a given crisis window leaves an all-False column.
+    df = _toy_event_df()
+    df["crisis_covid19"] = False
+    split = crisis_baseline_split(df, "crisis_covid19", "vader_compound")
+    assert split["period"].tolist() == ["Baseline"] * 4
 
 
 def test_crisis_party_split_labels_party_and_period():
@@ -123,3 +140,23 @@ def test_pmqs_split_by_pm_groups_by_pm_and_debate_type():
 def test_pmqs_split_by_pm_keeps_pms_separate():
     split = pmqs_split_by_pm(_toy_scored())
     assert set(split["pm_name"]) == {"A", "B"}
+
+
+def _toy_topic_df():
+    return pd.DataFrame(
+        {
+            "topic_0": [0.1, 0.2],
+            "topic_1": [0.3, 0.1],
+            "topic_2": [0.6, 0.7],
+        }
+    )
+
+
+def test_merge_overlapping_topics_sums_topic_0_and_1():
+    merged = merge_overlapping_topics(_toy_topic_df(), {"topic_2": "T2"}, "T0+1")
+    assert merged["T0+1"].tolist() == pytest.approx([0.4, 0.3])
+
+
+def test_merge_overlapping_topics_renames_the_rest_and_drops_originals():
+    merged = merge_overlapping_topics(_toy_topic_df(), {"topic_2": "T2"}, "T0+1")
+    assert set(merged.columns) == {"T0+1", "T2"}
