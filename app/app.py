@@ -232,35 +232,44 @@ with tab_affect:
 
 # --- Topics over time -------------------------------------------------------
 with tab_topics:
-    st.subheader("LDA topics over time (K=14)")
+    st.subheader("LDA topics over time (K=14, merged to 13 for display)")
     st.caption(
         "One document per (PM, sitting date). Chosen over BERTopic after "
         "comparison (phase5_topic_comparison_report.md) - BERTopic's default "
         "pipeline collapsed most of this 296-document corpus into 1-2 broad "
-        "clusters. Topics 'Ukraine/Russia' 0 and 1 overlap by design; see "
-        "phase5_lda_report.md."
+        "clusters. Topics 'Ukraine/Russia' 0 and 1 are the one pair documented "
+        "as overlapping by design (phase5_lda_report.md) and are summed into a "
+        "single series below - the other 12 stay separate, including the three "
+        "Covid-related topics, which look similar but track distinct sub-phases "
+        "(restrictions/testing, vaccines/schools, NHS pay/inquiry) rather than "
+        "one duplicated topic. Grey bands mark crisis windows (Phase 7); dotted "
+        "lines mark PM transitions."
     )
 
     _, top_words = load_lda_model()
     topics_df = load_lda_topics()
     topic_cols = [c for c in topics_df.columns if c.startswith("topic_")]
+
+    MERGED_LABEL = "T0+1: " + ", ".join(
+        dict.fromkeys(top_words[0][:3] + top_words[1][:3])
+    )
     topic_labels = {
         c: f"T{c.removeprefix('topic_')}: "
         + ", ".join(top_words[int(c.removeprefix("topic_"))][:3])
         for c in topic_cols
+        if c not in ("topic_0", "topic_1")
     }
 
     pms_present = topics_df["pm_name"].unique().tolist()
     selected = st.multiselect("PMs", pms_present, default=pms_present, key="topic_pms")
     filtered = topics_df[topics_df["pm_name"].isin(selected)].sort_values("sitting_date")
 
-    monthly = (
-        filtered.set_index("sitting_date")[topic_cols]
-        .resample("MS")
-        .mean()
-        .dropna(how="all")
-    )
-    monthly = monthly.rename(columns=topic_labels)
+    merged = filtered[topic_cols].copy()
+    merged[MERGED_LABEL] = merged["topic_0"] + merged["topic_1"]
+    merged = merged.drop(columns=["topic_0", "topic_1"]).rename(columns=topic_labels)
+    merged["sitting_date"] = filtered["sitting_date"].values
+
+    monthly = merged.set_index("sitting_date").resample("MS").mean().dropna(how="all")
 
     long_df = monthly.reset_index().melt(
         id_vars="sitting_date", var_name="Topic", value_name="Mean topic weight"
@@ -272,7 +281,32 @@ with tab_topics:
         color="Topic",
         labels={"sitting_date": "Month"},
     )
-    fig.update_layout(height=550)
+
+    chart_start, chart_end = monthly.index.min(), monthly.index.max()
+    for name, (start, end) in CRISIS_WINDOWS.items():
+        if pd.Timestamp(end) >= chart_start and pd.Timestamp(start) <= chart_end:
+            fig.add_vrect(
+                x0=start,
+                x1=end,
+                fillcolor="grey",
+                opacity=0.15,
+                line_width=0,
+                annotation_text=name.replace("_", " "),
+                annotation_position="top left",
+            )
+
+    pm_transitions = filtered.groupby("pm_name")["sitting_date"].min().sort_values()
+    for pm_name, start_date in pm_transitions.iloc[1:].items():
+        fig.add_vline(
+            x=start_date,
+            line_dash="dot",
+            line_color="rgba(255,255,255,0.4)",
+            annotation_text=pm_name,
+            annotation_position="top",
+            annotation_textangle=-90,
+        )
+
+    fig.update_layout(height=600)
     st.plotly_chart(_dark(fig), width="stretch")
 
     with st.expander("Topic word lists"):

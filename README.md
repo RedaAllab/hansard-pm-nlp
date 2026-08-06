@@ -80,7 +80,9 @@ Outputs are committed (charts render directly on GitHub). To re-run: `pip instal
 streamlit run app/app.py
 ```
 
-Four tabs: stylometric profile by PM, sentiment/certainty over time (with crisis windows), LDA topics over time, and the PM-attribution classifier's results. Filters (PM, date range) apply per tab, scoped to what the underlying data supports - see the in-app captions.
+Four tabs: stylometric profile by PM, sentiment/certainty over time (with crisis windows), LDA topics over time (crisis windows and dotted PM-transition lines, same as the sentiment tab), and the PM-attribution classifier's results. Filters (PM, date range) apply per tab, scoped to what the underlying data supports - see the in-app captions.
+
+The topics tab sums the one *documented* near-duplicate topic pair (T0+T1, both Ukraine/Russia/security - see `phase5_lda_report.md`) into a single series for display, 14 topics down to 13. The three Covid-related topics (restrictions/testing, vaccines/schools, NHS pay/inquiry) are deliberately left separate rather than also merged - they look similar at a glance but track genuinely distinct sub-phases, and merging them would erase the thematic drift the chart exists to show.
 
 `.streamlit/config.toml` pins `theme.base = "dark"`. Without it Streamlit follows the *viewer's* OS/browser color-scheme preference, and every chart's Plotly styling (`_dark()` in `app.py`) assumes a dark canvas - a light-mode viewer would get Plotly's pastel qualitative palette on a white background instead of the intended dark theme, which is illegible on some charts (this is what produced washed-out screenshots during development). Pinning the theme makes the dashboard look the same for every viewer regardless of their system settings.
 
