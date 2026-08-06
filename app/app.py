@@ -31,6 +31,7 @@ from hansard_pm_nlp.dashboard_helpers import (  # noqa: E402
     crisis_party_split,
     normalize_radar,
     parse_tfidf_terms,
+    pmqs_split_by_pm,
 )
 from hansard_pm_nlp.event_study import CRISIS_WINDOWS  # noqa: E402
 from hansard_pm_nlp.lda import get_top_words  # noqa: E402
@@ -306,6 +307,41 @@ with tab_affect:
         "Conservative side)."
     )
 
+    st.subheader("PMQs vs. other debates")
+    st.caption(
+        "Contribution-level, whole corpus - ignores the date-range slider "
+        "above, respects the PM selection. PROJECT_SUMMARY.md flags PMQs as "
+        "genre-built for evasiveness; on this hedging lexicon it's the "
+        "opposite (affect.py, affect_report.md) - PMQs hedges *less* than "
+        "other debates corpus-wide, which may mean the lexicon misses "
+        "PMQs-specific evasion (redirecting to the other party) rather than "
+        "PMs being less evasive there. Below: does that hold for every PM, "
+        "or is it driven by one of them?"
+    )
+    pmqs_metric = st.radio(
+        "Metric",
+        ["mean_hedge_rate", "mean_net_certainty"],
+        format_func=lambda x: {
+            "mean_hedge_rate": "Hedging rate",
+            "mean_net_certainty": "Net certainty",
+        }[x],
+        horizontal=True,
+        key="pmqs_metric",
+    )
+    affect_contributions = load_affect()
+    affect_selected = affect_contributions[affect_contributions["pm_name"].isin(selected)]
+    pmqs_by_pm = pmqs_split_by_pm(affect_selected)
+    pmqs_by_pm["Debate type"] = pmqs_by_pm["is_pmqs"].map({True: "PMQs", False: "Other"})
+    fig_pmqs = px.bar(
+        pmqs_by_pm.sort_values("pm_name"),
+        x="pm_name",
+        y=pmqs_metric,
+        color="Debate type",
+        barmode="group",
+    )
+    fig_pmqs.update_layout(height=420, xaxis_title="", yaxis_title=pmqs_metric)
+    st.plotly_chart(_dark(fig_pmqs), width="stretch")
+
 # --- Topics over time -------------------------------------------------------
 with tab_topics:
     st.subheader("LDA topics over time (K=14, merged to 13 for display)")
@@ -384,6 +420,29 @@ with tab_topics:
 
     fig.update_layout(height=600)
     st.plotly_chart(_dark(fig), width="stretch")
+
+    st.subheader("Mean topic weight by PM")
+    st.caption(
+        "Same 13 merged topics, averaged across each PM's sittings instead "
+        "of over time - a cross-sectional complement to the area chart "
+        "above: which topics a PM leans into overall, not when."
+    )
+    cross_sectional = filtered[topic_cols].copy()
+    cross_sectional[MERGED_LABEL] = cross_sectional["topic_0"] + cross_sectional["topic_1"]
+    cross_sectional = cross_sectional.drop(columns=["topic_0", "topic_1"]).rename(
+        columns=topic_labels
+    )
+    cross_sectional["pm_name"] = filtered["pm_name"].values
+    pm_topic_means = cross_sectional.groupby("pm_name").mean()
+
+    fig_heat = px.imshow(
+        pm_topic_means,
+        labels={"x": "Topic", "y": "PM", "color": "Mean weight"},
+        color_continuous_scale="Viridis",
+        aspect="auto",
+    )
+    fig_heat.update_layout(height=350)
+    st.plotly_chart(_dark(fig_heat), width="stretch")
 
     with st.expander("Topic word lists"):
         for i, words in top_words.items():

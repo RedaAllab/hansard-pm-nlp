@@ -6,6 +6,7 @@ from hansard_pm_nlp.dashboard_helpers import (
     crisis_party_split,
     normalize_radar,
     parse_tfidf_terms,
+    pmqs_split_by_pm,
 )
 
 
@@ -98,3 +99,27 @@ def test_crisis_party_split_labels_party_and_period():
     split = crisis_party_split(_toy_event_df(), "vader_compound")
     assert split["party"].tolist() == ["Conservative", "Conservative", "Labour", "Labour"]
     assert split["period"].tolist() == ["Crisis", "Baseline", "Crisis", "Baseline"]
+
+
+def _toy_scored():
+    return pd.DataFrame(
+        {
+            "pm_name": ["A", "A", "A", "B"],
+            "is_pmqs": [True, True, False, True],
+            "contribution_text": ["x", "y", "z", "w"],
+            "hedge_rate": [0.1, 0.3, 0.5, 0.2],
+            "net_certainty": [1.0, 1.0, 1.0, 1.0],
+        }
+    )
+
+
+def test_pmqs_split_by_pm_groups_by_pm_and_debate_type():
+    split = pmqs_split_by_pm(_toy_scored())
+    row = split[(split["pm_name"] == "A") & (split["is_pmqs"])]
+    assert row["n_contributions"].iloc[0] == 2
+    assert row["mean_hedge_rate"].iloc[0] == 0.2  # mean of 0.1, 0.3
+
+
+def test_pmqs_split_by_pm_keeps_pms_separate():
+    split = pmqs_split_by_pm(_toy_scored())
+    assert set(split["pm_name"]) == {"A", "B"}

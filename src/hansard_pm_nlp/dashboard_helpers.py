@@ -63,6 +63,20 @@ def crisis_baseline_split(event_df: pd.DataFrame, crisis_col: str, metric_col: s
     return pd.DataFrame({"period": period, "value": event_df[metric_col]})
 
 
+def pmqs_split_by_pm(scored: pd.DataFrame) -> pd.DataFrame:
+    """Per-PM version of affect.build_pmqs_split: hedging/certainty split by
+    debate type (PMQs vs. other) within each PM, to check whether the
+    PMQs-hedges-*less* paradox (affect.py, affect_report.md, whole-corpus)
+    holds for every PM individually or is driven by one of them.
+    """
+    agg = scored.groupby(["pm_name", "is_pmqs"]).agg(
+        n_contributions=("contribution_text", "size"),
+        mean_hedge_rate=("hedge_rate", "mean"),
+        mean_net_certainty=("net_certainty", "mean"),
+    )
+    return agg.reset_index()
+
+
 def crisis_party_split(event_df: pd.DataFrame, metric_col: str) -> pd.DataFrame:
     """Long-format table for the H3 pooled any-crisis x party interaction:
     one group per (party, in/out of any named crisis) combination, matching
