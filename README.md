@@ -80,7 +80,7 @@ Outputs are committed (charts render directly on GitHub). To re-run: `pip instal
 streamlit run app/app.py
 ```
 
-Four tabs: stylometric profile by PM, sentiment/certainty over time (with crisis windows), LDA topics over time (crisis windows and dotted PM-transition lines, same as the sentiment tab), and the PM-attribution classifier's results. Filters (PM, date range) apply per tab, scoped to what the underlying data supports - see the in-app captions.
+Four tabs: stylometric profile by PM (radar chart, normalized to the currently-selected PMs so deselecting an outlier rescales the rest, plus a TF-IDF distinctive-terms chart), sentiment/certainty over time (crisis windows, crisis-vs-baseline box plots for H2/H3, and a PMQs-vs-other-debates split), LDA topics over time (crisis windows, dotted PM-transition lines, and a cross-sectional topic-by-PM heatmap), and the PM-attribution classifier's results (confusion matrix with click-to-drill-down into the underlying sittings). Filters (PM, date range) apply per tab, scoped to what the underlying data supports - see the in-app captions. Transform logic behind these charts lives in `src/hansard_pm_nlp/dashboard_helpers.py` (unit tested, `tests/test_dashboard_helpers.py`), not inlined in the Streamlit script.
 
 The topics tab sums the one *documented* near-duplicate topic pair (T0+T1, both Ukraine/Russia/security - see `phase5_lda_report.md`) into a single series for display, 14 topics down to 13. The three Covid-related topics (restrictions/testing, vaccines/schools, NHS pay/inquiry) are deliberately left separate rather than also merged - they look similar at a glance but track genuinely distinct sub-phases, and merging them would erase the thematic drift the chart exists to show.
 
