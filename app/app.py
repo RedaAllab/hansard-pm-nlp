@@ -15,6 +15,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from gensim import corpora
 from gensim.models import LdaModel
+from plotly.subplots import make_subplots
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
@@ -43,6 +44,7 @@ PM_COLORS = {
     "Rishi Sunak": "#2ca02c",
     "Keir Starmer": "#d62728",
 }
+TOPIC_LINE_COLOR = "#4fc3f7"
 
 st.set_page_config(page_title="UK PM Rhetoric Analysis", layout="wide")
 
@@ -191,11 +193,12 @@ with tab_overview:
     st.caption(
         "One document per PM, so a term's score reflects how distinctive it "
         "is to that PM *relative to the other three* (Phase 3, eda.py), not "
-        "relative to general English - parliamentary-address terms (hon, "
-        "right, friend, gentleman) surface for everyone because sklearn's "
-        "default English stopword list doesn't cover them. Read this as "
-        "'what stands out about this PM's usage compared to the other "
-        "three', not as a topic summary."
+        "relative to general English. Parliamentary-address vocabulary (hon, "
+        "right, friend, gentleman, house...) is filtered out via the same "
+        "domain stopword list the LDA pipeline uses (preprocessing.py) - "
+        "otherwise it would dominate every PM's chart identically and say "
+        "nothing PM-specific. Read this as 'what stands out about this PM's "
+        "usage compared to the other three', not as a topic summary."
     )
     term_cols = st.columns(2)
     for i, pm in enumerate(all_pms):
@@ -404,8 +407,13 @@ with tab_topics:
         "single series below - the other 12 stay separate, including the three "
         "Covid-related topics, which look similar but track distinct sub-phases "
         "(restrictions/testing, vaccines/schools, NHS pay/inquiry) rather than "
-        "one duplicated topic. Grey bands mark crisis windows (Phase 7); dotted "
-        "lines mark PM transitions."
+        "one duplicated topic. One small panel per topic rather than 13 stacked "
+        "colors - past 8-10 categories a shared legend stops being readable, and "
+        "a stacked area hides whether a topic is rising or falling behind a "
+        "moving baseline. All panels share the same y-axis, so panel heights "
+        "are directly comparable. Grey bands mark crisis windows (Phase 7); "
+        "dotted lines mark PM transitions - repeated in every panel. Full topic "
+        "word lists are in the expander below the heatmap."
     )
 
     _, top_words = load_lda_model()
@@ -426,48 +434,68 @@ with tab_topics:
     selected = st.multiselect("PMs", pms_present, default=pms_present, key="topic_pms")
     filtered = topics_df[topics_df["pm_name"].isin(selected)].sort_values("sitting_date")
 
-    merged = merge_overlapping_topics(filtered[topic_cols], topic_labels, MERGED_LABEL)
-    merged["sitting_date"] = filtered["sitting_date"].values
+    if filtered.empty:
+        st.info("No PM selected.")
+    else:
+        merged = merge_overlapping_topics(filtered[topic_cols], topic_labels, MERGED_LABEL)
+        merged["sitting_date"] = filtered["sitting_date"].values
 
-    monthly = merged.set_index("sitting_date").resample("MS").mean().dropna(how="all")
+        monthly = merged.set_index("sitting_date").resample("MS").mean().dropna(how="all")
 
-    long_df = monthly.reset_index().melt(
-        id_vars="sitting_date", var_name="Topic", value_name="Mean topic weight"
-    )
-    fig = px.area(
-        long_df,
-        x="sitting_date",
-        y="Mean topic weight",
-        color="Topic",
-        labels={"sitting_date": "Month"},
-    )
+        topics = list(monthly.columns)
+        n_cols = 4
+        n_rows = -(-len(topics) // n_cols)  # ceil division
+        panel_titles = [t.split(":")[0].strip() for t in topics]
 
-    chart_start, chart_end = monthly.index.min(), monthly.index.max()
-    for name, (start, end) in CRISIS_WINDOWS.items():
-        if pd.Timestamp(end) >= chart_start and pd.Timestamp(start) <= chart_end:
-            fig.add_vrect(
-                x0=start,
-                x1=end,
-                fillcolor="grey",
-                opacity=0.15,
-                line_width=0,
-                annotation_text=name.replace("_", " "),
-                annotation_position="top left",
-            )
-
-    pm_transitions = filtered.groupby("pm_name")["sitting_date"].min().sort_values()
-    for pm_name, start_date in pm_transitions.iloc[1:].items():
-        fig.add_vline(
-            x=start_date,
-            line_dash="dot",
-            line_color="rgba(255,255,255,0.4)",
-            annotation_text=pm_name,
-            annotation_position="top",
-            annotation_textangle=-90,
+        fig = make_subplots(
+            rows=n_rows,
+            cols=n_cols,
+            subplot_titles=panel_titles,
+            shared_xaxes=True,
+            shared_yaxes=True,
+            vertical_spacing=0.5 / n_rows,
+            horizontal_spacing=0.03,
         )
 
-    fig.update_layout(height=600)
-    st.plotly_chart(_dark(fig), width="stretch")
+        chart_start, chart_end = monthly.index.min(), monthly.index.max()
+        pm_transitions = filtered.groupby("pm_name")["sitting_date"].min().sort_values()
+        y_max = monthly.max().max() * 1.1
+
+        for i, topic in enumerate(topics):
+            row, col = divmod(i, n_cols)
+            row, col = row + 1, col + 1
+            fig.add_trace(
+                go.Scatter(
+                    x=monthly.index,
+                    y=monthly[topic],
+                    mode="lines",
+                    line={"color": TOPIC_LINE_COLOR, "width": 1.6},
+                    fill="tozeroy",
+                    fillcolor="rgba(79,195,247,0.15)",
+                    showlegend=False,
+                    hovertemplate="%{x|%b %Y}: %{y:.3f}<extra></extra>",
+                ),
+                row=row,
+                col=col,
+            )
+            fig.update_yaxes(range=[0, y_max], row=row, col=col, showticklabels=(col == 1))
+
+        for _, (start, end) in CRISIS_WINDOWS.items():
+            if pd.Timestamp(end) >= chart_start and pd.Timestamp(start) <= chart_end:
+                fig.add_vrect(
+                    x0=start, x1=end, fillcolor="grey", opacity=0.15, line_width=0,
+                    row="all", col="all",
+                )
+        for pm_name, start_date in pm_transitions.iloc[1:].items():
+            fig.add_vline(
+                x=start_date, line_dash="dot", line_color="rgba(255,255,255,0.35)",
+                row="all", col="all",
+            )
+
+        fig.update_layout(height=185 * n_rows, margin={"t": 30, "b": 10})
+        for annotation in fig.layout.annotations:
+            annotation.font.size = 11
+        st.plotly_chart(_dark(fig), width="stretch")
 
     st.subheader("Mean topic weight by PM")
     st.caption(
