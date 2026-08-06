@@ -25,6 +25,13 @@ PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 # of which this dashboard uses (all heavy computation already happened
 # offline; see requirements-app.txt).
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+from hansard_pm_nlp.dashboard_helpers import (  # noqa: E402
+    confusion_cell_detail,
+    crisis_baseline_split,
+    crisis_party_split,
+    normalize_radar,
+    parse_tfidf_terms,
+)
 from hansard_pm_nlp.event_study import CRISIS_WINDOWS  # noqa: E402
 from hansard_pm_nlp.lda import get_top_words  # noqa: E402
 
@@ -129,39 +136,74 @@ with tab_overview:
     ]
     cols = [c for c, _ in metrics_cfg]
     labels = [label for _, label in metrics_cfg]
+    n_by_pm = profile.set_index("pm_name")["n_contributions"]
 
-    normalized = profile.set_index("pm_name")[cols]
-    normalized = (normalized - normalized.min()) / (normalized.max() - normalized.min())
+    if not selected_pms:
+        st.info("Select at least one PM to display the radar chart.")
+    else:
+        normalized = normalize_radar(profile, cols, selected_pms)
 
-    fig = go.Figure()
-    for pm in selected_pms:
-        values = normalized.loc[pm, cols].tolist()
-        fig.add_trace(
-            go.Scatterpolar(
-                r=values + [values[0]],
-                theta=labels + [labels[0]],
-                fill="toself",
-                name=pm,
-                line_color=PM_COLORS.get(pm),
+        fig = go.Figure()
+        for pm in selected_pms:
+            values = normalized.loc[pm, cols].tolist()
+            fig.add_trace(
+                go.Scatterpolar(
+                    r=values + [values[0]],
+                    theta=labels + [labels[0]],
+                    fill="toself",
+                    name=f"{pm} (n={n_by_pm[pm]})",
+                    line_color=PM_COLORS.get(pm),
+                )
             )
+        fig.update_layout(
+            polar={"radialaxis": {"visible": True, "range": [0, 1]}},
+            showlegend=True,
+            height=550,
         )
-    fig.update_layout(
-        polar={"radialaxis": {"visible": True, "range": [0, 1]}},
-        showlegend=True,
-        height=550,
-    )
-    st.plotly_chart(_dark(fig), width="stretch")
-    st.caption(
-        "Each axis min-max normalized across PMs (0=lowest, 1=highest) so "
-        "shapes are comparable. Type-token ratio (TTR) is deliberately left "
-        "off this chart - it is length-biased (lexical.py) and Liz Truss's "
-        "tiny corpus (8,842 words vs 220k-520k for the others) makes her TTR "
-        "an artifact of sample size, not style; MTLD is the length-corrected "
-        "alternative shown here. TTR is still in the raw values table below."
-    )
+        st.plotly_chart(_dark(fig), width="stretch")
+        st.caption(
+            "Each axis min-max normalized across the *selected* PMs only "
+            "(0=lowest, 1=highest among them) - deselect a PM below to "
+            "rescale the others rather than leaving the axes compressed by "
+            "a PM that's no longer even drawn. Legend shows each PM's "
+            "contribution count: Liz Truss's is a fifth to a fortieth of "
+            "the others (5 documents/49-day tenure), so her line is more "
+            "sample-size noise than settled style - read it with that in "
+            "mind. Type-token ratio (TTR) is left off entirely - it is "
+            "length-biased (lexical.py) and Truss's tiny corpus (8,842 "
+            "words vs 220k-520k) makes her TTR purely an artifact of "
+            "sample size; MTLD is the length-corrected alternative shown "
+            "here. TTR is still in the raw values table below."
+        )
 
     with st.expander("Raw values"):
         st.dataframe(profile[["pm_name", *cols]].set_index("pm_name"))
+
+    st.subheader("Distinctive terms per PM (TF-IDF)")
+    st.caption(
+        "One document per PM, so a term's score reflects how distinctive it "
+        "is to that PM *relative to the other three* (Phase 3, eda.py), not "
+        "relative to general English - parliamentary-address terms (hon, "
+        "right, friend, gentleman) surface for everyone because sklearn's "
+        "default English stopword list doesn't cover them. Read this as "
+        "'what stands out about this PM's usage compared to the other "
+        "three', not as a topic summary."
+    )
+    term_cols = st.columns(2)
+    for i, pm in enumerate(all_pms):
+        terms = parse_tfidf_terms(profile.loc[profile["pm_name"] == pm, "top_tfidf_terms"].iloc[0])
+        terms_df = pd.DataFrame(terms[:10], columns=["term", "score"]).sort_values("score")
+        fig = px.bar(
+            terms_df,
+            x="score",
+            y="term",
+            orientation="h",
+            title=pm,
+            color_discrete_sequence=[PM_COLORS.get(pm)],
+        )
+        fig.update_layout(height=350, showlegend=False, margin={"t": 40})
+        with term_cols[i % 2]:
+            st.plotly_chart(_dark(fig), width="stretch")
 
 # --- Sentiment & certainty over time ---------------------------------------
 with tab_affect:
@@ -229,6 +271,40 @@ with tab_affect:
             )
     fig.update_layout(height=500, xaxis_title="Sitting date", yaxis_title=dv_choice)
     st.plotly_chart(_dark(fig), width="stretch")
+
+    st.subheader("Crisis vs. baseline")
+    st.caption(
+        "Same crisis dummies as Phase 7's OLS regression (event_study.py) - "
+        "this is exactly what was tested, not a redrawn window. Ignores the "
+        "date-range slider above (a period comparison needs both sides "
+        "populated) but respects the PM selection."
+    )
+    box_df = event_df[event_df["pm_name"].isin(selected)]
+
+    col_h2, col_h3 = st.columns(2)
+    with col_h2:
+        crisis_choice = st.selectbox(
+            "Crisis (H2)", list(CRISIS_WINDOWS), format_func=lambda x: x.replace("_", " ")
+        )
+        split_h2 = crisis_baseline_split(box_df, f"crisis_{crisis_choice}", dv_choice)
+        fig_h2 = px.box(split_h2, x="period", y="value", color="period", points="all")
+        fig_h2.update_layout(height=420, showlegend=False, yaxis_title=dv_choice)
+        st.plotly_chart(_dark(fig_h2), width="stretch")
+    with col_h3:
+        st.markdown("**Any crisis x party (H3)**")
+        split_h3 = crisis_party_split(box_df, dv_choice)
+        fig_h3 = px.box(split_h3, x="party", y="value", color="period", points="all")
+        fig_h3.update_layout(height=420, yaxis_title=dv_choice)
+        st.plotly_chart(_dark(fig_h3), width="stretch")
+
+    st.caption(
+        "Phase 7: no effect survives Benjamini-Hochberg correction for "
+        "either H2 or H3 - these boxes are why, heavy overlap between "
+        "crisis and baseline in every case. H3 is additionally "
+        "underpowered by construction: Labour's crisis side here is a "
+        "single crisis window under a single PM (9 sittings vs. 79 for the "
+        "Conservative side)."
+    )
 
 # --- Topics over time -------------------------------------------------------
 with tab_topics:
@@ -358,7 +434,25 @@ with tab_classifier:
         color_continuous_scale="Blues",
     )
     fig.update_layout(height=450)
-    st.plotly_chart(_dark(fig), width="stretch")
+    cm_event = st.plotly_chart(
+        _dark(fig),
+        width="stretch",
+        on_select="rerun",
+        selection_mode="points",
+        key="cm_chart",
+    )
+
+    cm_points = cm_event.selection.points
+    if cm_points:
+        actual_pm, predicted_pm = cm_points[0]["y"], cm_points[0]["x"]
+        detail = confusion_cell_detail(predictions, model_choice, actual_pm, predicted_pm)
+        st.caption(
+            f"{len(detail)} sitting(s) where the actual speaker was **{actual_pm}** "
+            f"and the model predicted **{predicted_pm}**:"
+        )
+        st.dataframe(detail, hide_index=True, width="stretch")
+    else:
+        st.caption("Click a cell above to see which sittings it contains.")
 
     fi = fi_logreg if model_choice == "pred_logreg" else fi_hgb
     fig2 = px.bar(
