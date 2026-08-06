@@ -4,6 +4,8 @@ NLP analysis of UK Prime Ministers' rhetoric (2019-present), built on the parque
 
 **[Live dashboard](https://hansard-pm-nlp-nhenez39aujxgtejnyjvrg.streamlit.app)** · Four Prime Ministers (Johnson, Truss, Sunak, Starmer), 291 Commons sittings, four layered NLP analyses, tested against four pre-registered hypotheses.
 
+**[Read the full write-up](WRITEUP.md)** for the reasoning behind each modeling choice and the complete results, including the null ones.
+
 ## Results by hypothesis
 
 | Hypothesis | Method | Result |
