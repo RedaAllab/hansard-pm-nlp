@@ -7,7 +7,7 @@ import re
 from collections import Counter
 
 import textstat
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 
 _WORD_RE = re.compile(r"[a-zA-Z']+")
 
@@ -75,14 +75,23 @@ def top_ngrams(tokens: list[str], n: int = 2, top_k: int = 20) -> list[tuple[str
 
 
 def tfidf_top_terms_by_group(
-    group_texts: dict[str, str], top_k: int = 20
+    group_texts: dict[str, str],
+    top_k: int = 20,
+    extra_stopwords: frozenset[str] | None = None,
 ) -> dict[str, list[tuple[str, float]]]:
     """TF-IDF over one document per group (e.g. one document per PM), so a
     term's score reflects how distinctive it is to that PM relative to the
     others in `group_texts`, not its raw frequency.
+
+    With only one document per group, IDF alone barely suppresses shared
+    vocabulary that's simply used at different rates (e.g. "hon", "friend") -
+    pass `extra_stopwords` (e.g. preprocessing.STOPWORDS) to remove Hansard's
+    parliamentary-address vocabulary the same way the LDA pipeline already
+    does, on top of the standard English stopword list.
     """
     names = list(group_texts)
-    vectorizer = TfidfVectorizer(stop_words="english", max_features=5000)
+    stop_words = ENGLISH_STOP_WORDS | (extra_stopwords or frozenset())
+    vectorizer = TfidfVectorizer(stop_words=list(stop_words), max_features=5000)
     matrix = vectorizer.fit_transform([group_texts[name] for name in names])
     terms = vectorizer.get_feature_names_out()
 

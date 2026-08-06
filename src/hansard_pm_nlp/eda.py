@@ -25,6 +25,7 @@ from hansard_pm_nlp.lexical import (
     top_ngrams,
     type_token_ratio,
 )
+from hansard_pm_nlp.preprocessing import STOPWORDS as DOMAIN_STOPWORDS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
@@ -46,7 +47,9 @@ def build_summary(df: pd.DataFrame, top_k: int = 15) -> pd.DataFrame:
         for pm, group in df.groupby("pm_name")
     }
     per_pm_text = {pm: " ".join(group["contribution_text"]) for pm, group in df.groupby("pm_name")}
-    tfidf_terms = tfidf_top_terms_by_group(per_pm_text, top_k=top_k)
+    tfidf_terms = tfidf_top_terms_by_group(
+        per_pm_text, top_k=top_k, extra_stopwords=DOMAIN_STOPWORDS
+    )
 
     rows = []
     agg = scored.groupby("pm_name").agg(

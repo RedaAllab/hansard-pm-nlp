@@ -42,6 +42,23 @@ def test_build_summary_surfaces_distinctive_terms():
     assert "covid" in row_b["top_tfidf_terms"]
 
 
+def test_build_summary_tfidf_excludes_hansard_address_vocabulary():
+    df = pd.DataFrame(
+        {
+            "pm_name": ["A", "B"],
+            "contribution_text": [
+                "My hon. Friend is right, hon. Members will know Brexit means Brexit.",
+                "The hon. Gentleman and right hon. Friend know Covid restrictions ease.",
+            ],
+            "is_pmqs": [True, True],
+        }
+    )
+    summary = build_summary(df, top_k=5)
+    for _, row in summary.iterrows():
+        assert "hon" not in row["top_tfidf_terms"]
+        assert "friend" not in row["top_tfidf_terms"]
+
+
 def _toy_time_df():
     # PM A: 10 words in January (survives a min_words=5 floor).
     # PM B: 3 words in January (dropped by the same floor).

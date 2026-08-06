@@ -84,3 +84,20 @@ def test_tfidf_top_terms_by_group_surfaces_distinctive_terms():
     scores_b = dict(result["pm_b"])
     assert scores_a["brexit"] > scores_a["parliament"]
     assert scores_b["covid"] > scores_b["parliament"]
+
+
+def test_tfidf_top_terms_by_group_drops_extra_stopwords():
+    # "hon" appears in both groups at a differential rate - with only one
+    # document per group, IDF alone doesn't suppress it (see lexical.py
+    # docstring); extra_stopwords must filter it out explicitly.
+    group_texts = {
+        "pm_a": "hon hon hon hon brexit sovereignty parliament",
+        "pm_b": "hon hon covid lockdown parliament",
+    }
+    result = tfidf_top_terms_by_group(
+        group_texts, top_k=5, extra_stopwords=frozenset({"hon"})
+    )
+    terms_a = {term for term, _ in result["pm_a"]}
+    terms_b = {term for term, _ in result["pm_b"]}
+    assert "hon" not in terms_a
+    assert "hon" not in terms_b
