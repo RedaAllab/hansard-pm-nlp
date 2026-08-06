@@ -23,3 +23,5 @@ _mise en cause d'un adversaire ou d'une situation, alerte sur un problème, ton 
 - L'ironie ou le sarcasme se codent selon le ton réel visé (souvent négatif/critique), pas selon le sens littéral des mots.
 - Une déviation vers l'opposition sans reproche explicite reste Neutre ; avec un reproche explicite, elle devient Négatif.
 - On code le sentiment exprimé PAR le Premier ministre, jamais le sentiment des autres à son sujet.
+- En cas de mélange où un pôle est porté par des affirmations concrètes ou chiffrées et l'autre par une formule générique, privilégier le pôle concret - ex. un bilan chiffré pèse plus qu'un slogan de réassurance générique comme 'nous allons régler ça'.
+- Si la contribution répond visiblement à une question absente du texte (le corpus ne contient que les tours du Premier ministre), coder uniquement son contenu explicite visible, sans deviner la question.

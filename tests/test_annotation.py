@@ -2,12 +2,16 @@ import pandas as pd
 import pytest
 
 from hansard_pm_nlp.annotation import (
+    CONTEXT_COLUMNS,
     LABEL_COLUMN,
     MIN_WORDS,
+    append_to_sample,
+    build_crisis_sample,
     build_sample,
     export_template,
     load_annotations,
 )
+from hansard_pm_nlp.event_study import CRISIS_WINDOWS
 
 LONG_TEXT = " ".join(["word"] * (MIN_WORDS + 5))
 SHORT_TEXT = "No."
@@ -23,6 +27,27 @@ def _contributions(pm_counts: dict[str, int], text: str = LONG_TEXT) -> pd.DataF
                     "contribution_ext_id": f"c{i}",
                     "pm_name": pm_name,
                     "sitting_date": pd.Timestamp("2024-01-01") + pd.Timedelta(days=i),
+                    "debate_section": "Engagements",
+                    "is_pmqs": True,
+                    "contribution_text": text,
+                }
+            )
+            i += 1
+    return pd.DataFrame(rows)
+
+
+def _crisis_contributions(window_counts: dict[str, int], text: str = LONG_TEXT) -> pd.DataFrame:
+    """Rows dated inside real CRISIS_WINDOWS ranges, for build_crisis_sample tests."""
+    rows = []
+    i = 0
+    for window_name, n in window_counts.items():
+        start = pd.Timestamp(CRISIS_WINDOWS[window_name][0])
+        for _ in range(n):
+            rows.append(
+                {
+                    "contribution_ext_id": f"x{i}",
+                    "pm_name": "Boris Johnson",
+                    "sitting_date": start + pd.Timedelta(days=i % 3),
                     "debate_section": "Engagements",
                     "is_pmqs": True,
                     "contribution_text": text,
@@ -116,3 +141,62 @@ def test_load_annotations_accepts_fully_labeled_file(tmp_path):
     df.to_csv(path, index=False)
     loaded = load_annotations(path)
     assert list(loaded[LABEL_COLUMN]) == ["positive", "negative"]
+
+
+def test_crisis_sample_matches_targets():
+    contributions = _crisis_contributions({"mini_budget": 10, "ukraine_invasion": 10})
+    targets = {"mini_budget": 4, "ukraine_invasion": 6}
+    sample = build_crisis_sample(contributions, exclude_ids=[], targets=targets)
+    assert len(sample) == 10
+    for window_name, target in targets.items():
+        start, end = CRISIS_WINDOWS[window_name]
+        n_in_window = sample["sitting_date"].astype(str).between(start, end).sum()
+        assert n_in_window == target
+
+
+def test_crisis_sample_excludes_already_sampled_ids():
+    contributions = _crisis_contributions({"mini_budget": 5})
+    already = contributions["contribution_ext_id"].iloc[:2].tolist()
+    sample = build_crisis_sample(contributions, exclude_ids=already, targets={"mini_budget": 3})
+    assert not set(sample["contribution_ext_id"]) & set(already)
+
+
+def test_crisis_sample_raises_when_window_pool_too_small():
+    contributions = _crisis_contributions({"mini_budget": 2})
+    with pytest.raises(ValueError, match="fewer than the target"):
+        build_crisis_sample(contributions, exclude_ids=[], targets={"mini_budget": 5})
+
+
+def test_append_to_sample_preserves_existing_labels(tmp_path):
+    path = tmp_path / "sample.csv"
+    existing = pd.DataFrame(
+        {**{col: ["v"] for col in CONTEXT_COLUMNS}, LABEL_COLUMN: ["positive"]}
+    )
+    existing["contribution_ext_id"] = ["c0"]
+    existing.to_csv(path, index=False)
+
+    addition = pd.DataFrame(
+        {**{col: ["v"] for col in CONTEXT_COLUMNS}}
+    )
+    addition["contribution_ext_id"] = ["c1"]
+
+    append_to_sample(addition, path)
+    combined = pd.read_csv(path)
+    assert len(combined) == 2
+    assert combined.loc[combined["contribution_ext_id"] == "c0", LABEL_COLUMN].iloc[0] == "positive"
+    assert pd.isna(combined.loc[combined["contribution_ext_id"] == "c1", LABEL_COLUMN].iloc[0])
+
+
+def test_append_to_sample_rejects_duplicate_ids(tmp_path):
+    path = tmp_path / "sample.csv"
+    existing = pd.DataFrame(
+        {**{col: ["v"] for col in CONTEXT_COLUMNS}, LABEL_COLUMN: [""]}
+    )
+    existing["contribution_ext_id"] = ["c0"]
+    existing.to_csv(path, index=False)
+
+    addition = pd.DataFrame({**{col: ["v"] for col in CONTEXT_COLUMNS}})
+    addition["contribution_ext_id"] = ["c0"]
+
+    with pytest.raises(ValueError, match="already in"):
+        append_to_sample(addition, path)

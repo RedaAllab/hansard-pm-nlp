@@ -23,6 +23,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from hansard_pm_nlp.event_study import CRISIS_WINDOWS
 from hansard_pm_nlp.lexical import tokenize_words
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +44,22 @@ PM_SAMPLE_TARGETS = {
     "Rishi Sunak": 55,
     "Keir Starmer": 70,
     "Liz Truss": 20,
+}
+
+#: A random PM-stratified draw barely touches the crisis windows CRISIS_WINDOWS
+#: names (mini_budget is 25 days, ukraine_invasion 3 months, out of years-long
+#: tenures) - the first 250-row sample landed only 5/9/3 rows in mini_budget/
+#: ukraine_invasion/labour_leadership_crisis. That's fine for evaluating raw
+#: classifier accuracy, but useless for the actual downstream question (does a
+#: fine-tuned score change H2/H3's null result), which needs enough gold labels
+#: *inside* those windows to check. covid19 already has 37 rows from the first
+#: draw (16-month window), so it is not topped up here. Seed offset from
+#: RANDOM_SEED so this second draw doesn't reproduce the same row order.
+CRISIS_SAMPLE_SEED = RANDOM_SEED + 1
+CRISIS_SAMPLE_TARGETS = {
+    "mini_budget": 15,
+    "ukraine_invasion": 15,
+    "labour_leadership_crisis": 15,
 }
 
 #: Contributions shorter than this carry too little text to judge tone from -
@@ -98,6 +115,13 @@ DECISION_RULES = (
     "avec un reproche explicite, elle devient Négatif.",
     "On code le sentiment exprimé PAR le Premier ministre, jamais le "
     "sentiment des autres à son sujet.",
+    "En cas de mélange où un pôle est porté par des affirmations concrètes "
+    "ou chiffrées et l'autre par une formule générique, privilégier le pôle "
+    "concret - ex. un bilan chiffré pèse plus qu'un slogan de réassurance "
+    "générique comme 'nous allons régler ça'.",
+    "Si la contribution répond visiblement à une question absente du texte "
+    "(le corpus ne contient que les tours du Premier ministre), coder "
+    "uniquement son contenu explicite visible, sans deviner la question.",
 )
 
 
@@ -131,6 +155,67 @@ def build_sample(
 
     sample = pd.concat(parts).sort_values(["pm_name", "sitting_date"])
     return sample.reset_index(drop=True)
+
+
+def build_crisis_sample(
+    contributions: pd.DataFrame,
+    exclude_ids: pd.Series | list[str],
+    targets: dict[str, int] = CRISIS_SAMPLE_TARGETS,
+    seed: int = CRISIS_SAMPLE_SEED,
+) -> pd.DataFrame:
+    """Draw a supplementary sample from inside named crisis windows.
+
+    `exclude_ids` must be the contribution_ext_ids already in the main sample -
+    otherwise a contribution could be drawn twice across the two files, and a
+    human coder would silently label the same text under two different rows.
+
+    Raises on a pool smaller than its target, same reasoning as build_sample:
+    mini_budget in particular only has ~23 eligible contributions total (a
+    25-day window, one PM), so silently under-filling would be easy to miss.
+    """
+    eligible = _eligible(contributions)
+    eligible = eligible[~eligible["contribution_ext_id"].isin(set(exclude_ids))]
+
+    parts = []
+    seen_ids: set[str] = set()
+    for window_name, target in targets.items():
+        start, end = CRISIS_WINDOWS[window_name]
+        in_window = eligible["sitting_date"].astype(str).between(start, end)
+        pool = eligible[in_window & ~eligible["contribution_ext_id"].isin(seen_ids)]
+        if len(pool) < target:
+            raise ValueError(
+                f"Crisis window '{window_name}' has only {len(pool)} eligible "
+                f"contributions (>= {MIN_WORDS} words, not already sampled), "
+                f"fewer than the target of {target}."
+            )
+        drawn = pool.sample(n=target, random_state=seed)
+        seen_ids |= set(drawn["contribution_ext_id"])
+        parts.append(drawn)
+
+    sample = pd.concat(parts).sort_values("sitting_date")
+    return sample.reset_index(drop=True)
+
+
+def append_to_sample(addition: pd.DataFrame, path: str | Path | None = None) -> Path:
+    """Add blank-labeled rows to an existing sample CSV, preserving its labels.
+
+    Unlike export_template, this is meant to run against a file that may
+    already have annotations in it - it must never touch existing rows, only
+    add new ones. Raises on an id already present, so a re-run can't silently
+    duplicate a row a coder has already labeled.
+    """
+    resolved = Path(path) if path is not None else PROCESSED_DIR / SAMPLE_FILENAME
+    existing = pd.read_csv(resolved, dtype={LABEL_COLUMN: "string"})
+
+    overlap = set(existing["contribution_ext_id"]) & set(addition["contribution_ext_id"])
+    if overlap:
+        raise ValueError(f"{len(overlap)} contribution(s) already in {resolved}: {overlap}")
+
+    new_rows = addition[list(CONTEXT_COLUMNS)].copy()
+    new_rows[LABEL_COLUMN] = ""
+    combined = pd.concat([existing, new_rows], ignore_index=True)
+    combined.to_csv(resolved, index=False)
+    return resolved
 
 
 def export_template(sample: pd.DataFrame, path: str | Path | None = None) -> Path:
