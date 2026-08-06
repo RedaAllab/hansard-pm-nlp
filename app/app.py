@@ -76,6 +76,11 @@ def load_affect_summary() -> pd.DataFrame:
 
 
 @st.cache_data
+def load_mtld_over_time() -> pd.DataFrame:
+    return pd.read_parquet(PROCESSED_DIR / "mtld_over_time.parquet")
+
+
+@st.cache_data
 def load_event_study() -> pd.DataFrame:
     return pd.read_parquet(PROCESSED_DIR / "event_study_dataset.parquet")
 
@@ -207,6 +212,34 @@ with tab_overview:
         fig.update_layout(height=350, showlegend=False, margin={"t": 40})
         with term_cols[i % 2]:
             st.plotly_chart(_dark(fig), width="stretch")
+
+    st.subheader("Lexical diversity (MTLD) over time")
+    st.caption(
+        "MTLD recomputed per PM per month (eda.py, build_mtld_over_time()), "
+        "unlike the whole-corpus MTLD in the radar above - shows drift "
+        "within a tenure rather than one settled number. Months under "
+        "1,500 words are dropped rather than plotted, since MTLD gets "
+        "noisy on too little text - the same length-sensitivity issue "
+        "flagged for TTR, just smaller-scale. Liz Truss's 49-day tenure "
+        "survives that floor for only 2 of her months; read her line as "
+        "two data points, not a trend."
+    )
+    mtld_over_time = load_mtld_over_time()
+    mtld_filtered = mtld_over_time[mtld_over_time["pm_name"].isin(selected_pms)]
+    if mtld_filtered.empty:
+        st.info("No PM selected, or no month has enough text to show.")
+    else:
+        fig_mtld = px.line(
+            mtld_filtered.sort_values("period"),
+            x="period",
+            y="mtld",
+            color="pm_name",
+            markers=True,
+            color_discrete_map=PM_COLORS,
+            labels={"period": "Month", "mtld": "MTLD", "pm_name": "PM"},
+        )
+        fig_mtld.update_layout(height=450)
+        st.plotly_chart(_dark(fig_mtld), width="stretch")
 
 # --- Sentiment & certainty over time ---------------------------------------
 with tab_affect:

@@ -1,8 +1,10 @@
 # Phase 3 - Lexical baseline
 
-Generated: 2026-08-05T19:30:47.393461+00:00
+Generated: 2026-08-06T07:02:07.152565+00:00
 
 Descriptive statistics only - no hypothesis tests, no modeling. Readability/sentence length are averaged per contribution; lexical diversity (TTR, MTLD) and n-grams are computed on each PM's full concatenated corpus (see hansard_pm_nlp.eda docstring for why).
+
+`mtld_over_time.parquet` additionally bins MTLD by month per PM (build_mtld_over_time()), dropping any bin under 1,500 words so a sparse month doesn't get plotted as a misleadingly precise point - see the dashboard's Overview tab.
 
 ## Boris Johnson
 

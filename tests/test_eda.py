@@ -1,6 +1,6 @@
 import pandas as pd
 
-from hansard_pm_nlp.eda import build_summary
+from hansard_pm_nlp.eda import build_mtld_over_time, build_summary
 
 
 def _toy_df():
@@ -40,3 +40,37 @@ def test_build_summary_surfaces_distinctive_terms():
     row_b = summary[summary["pm_name"] == "B"].iloc[0]
     assert "brexit" in row_a["top_tfidf_terms"]
     assert "covid" in row_b["top_tfidf_terms"]
+
+
+def _toy_time_df():
+    # PM A: 10 words in January (survives a min_words=5 floor).
+    # PM B: 3 words in January (dropped by the same floor).
+    return pd.DataFrame(
+        {
+            "pm_name": ["A", "A", "B"],
+            "sitting_date": ["2020-01-05", "2020-01-20", "2020-01-10"],
+            "contribution_text": [
+                "one two three four five",
+                "six seven eight nine ten",
+                "only three words",
+            ],
+        }
+    )
+
+
+def test_build_mtld_over_time_drops_sparse_bins():
+    result = build_mtld_over_time(_toy_time_df(), min_words=5)
+    assert set(result["pm_name"]) == {"A"}
+
+
+def test_build_mtld_over_time_keeps_word_rich_bins():
+    result = build_mtld_over_time(_toy_time_df(), min_words=5)
+    row = result.iloc[0]
+    assert row["pm_name"] == "A"
+    assert row["word_count"] == 10
+    assert row["period"] == pd.Timestamp("2020-01-01")
+
+
+def test_build_mtld_over_time_empty_when_nothing_survives_the_floor():
+    result = build_mtld_over_time(_toy_time_df(), min_words=1000)
+    assert result.empty

@@ -76,6 +76,39 @@ def build_summary(df: pd.DataFrame, top_k: int = 15) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("pm_name").reset_index(drop=True)
 
 
+def build_mtld_over_time(df: pd.DataFrame, freq: str = "MS", min_words: int = 1500) -> pd.DataFrame:
+    """Lexical diversity (MTLD) per PM, binned by `freq` (default monthly).
+
+    build_summary() computes MTLD once per PM on their full concatenated
+    corpus; this recomputes it per time bin instead, to show drift over a
+    tenure. That reintroduces MTLD's own length-sensitivity at a smaller
+    scale - the same problem TTR has more severely (lexical.py, radar
+    caption) - so bins under `min_words` are dropped rather than plotted as
+    a misleadingly precise point. Mainly affects Liz Truss (49-day tenure,
+    8,842 words total): expect few or no surviving bins for her.
+    """
+    df = df.copy()
+    df["sitting_date"] = pd.to_datetime(df["sitting_date"])
+
+    rows = []
+    for (pm, period), group in df.groupby(["pm_name", pd.Grouper(key="sitting_date", freq=freq)]):
+        tokens = tokenize_words(" ".join(group["contribution_text"]))
+        if len(tokens) < min_words:
+            continue
+        rows.append(
+            {
+                "pm_name": pm,
+                "period": period,
+                "word_count": len(tokens),
+                "mtld": mtld(tokens),
+            }
+        )
+    columns = ["pm_name", "period", "word_count", "mtld"]
+    return pd.DataFrame(rows, columns=columns).sort_values(["pm_name", "period"]).reset_index(
+        drop=True
+    )
+
+
 def write_report(summary: pd.DataFrame, path: Path) -> None:
     generated_at = dt.datetime.now(dt.UTC).isoformat()
     lines = [
@@ -87,6 +120,11 @@ def write_report(summary: pd.DataFrame, path: Path) -> None:
         "Readability/sentence length are averaged per contribution; lexical "
         "diversity (TTR, MTLD) and n-grams are computed on each PM's full "
         "concatenated corpus (see hansard_pm_nlp.eda docstring for why).",
+        "",
+        "`mtld_over_time.parquet` additionally bins MTLD by month per PM "
+        "(build_mtld_over_time()), dropping any bin under 1,500 words so a "
+        "sparse month doesn't get plotted as a misleadingly precise point - "
+        "see the dashboard's Overview tab.",
         "",
     ]
     for _, row in summary.iterrows():
@@ -112,7 +150,14 @@ def main() -> None:
     summary = build_summary(df)
     summary.to_csv(PROCESSED_DIR / "eda_summary.csv", index=False)
     write_report(summary, PROCESSED_DIR / "eda_report.md")
-    print(f"Wrote {PROCESSED_DIR / 'eda_summary.csv'} and eda_report.md")
+
+    mtld_over_time = build_mtld_over_time(df)
+    mtld_over_time.to_parquet(PROCESSED_DIR / "mtld_over_time.parquet", index=False)
+
+    print(
+        f"Wrote {PROCESSED_DIR / 'eda_summary.csv'}, eda_report.md, "
+        "and mtld_over_time.parquet"
+    )
 
 
 if __name__ == "__main__":
