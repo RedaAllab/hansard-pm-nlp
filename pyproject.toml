@@ -17,6 +17,8 @@ dependencies = [
     "statsmodels>=0.14",
     "streamlit>=1.38",
     "plotly>=5.22",
+    "datasets>=2.19",
+    "accelerate>=0.30",
 ]
 
 [project.optional-dependencies]
