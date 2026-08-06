@@ -10,3 +10,5 @@ __pycache__/
 *.part
 logs/
 .env
+
+data/processed/sentiment_annotation_tool.html
